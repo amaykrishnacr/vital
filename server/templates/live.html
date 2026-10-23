@@ -209,7 +209,7 @@ function render(d) {
   $("sTemp").textContent = L ? fmt.n(L.temp, 1) : "--";
   $("sHrFoot").textContent = `Your usual resting: ${fmt.n(b.hr_lo)}–${fmt.n(b.hr_hi)}`;
   $("sSpo2Foot").textContent = L ? (L.spo2 >= 95 ? "Healthy" : L.spo2 >= 90 ? "A little low" : "Low") : "--";
-  $("sTempFoot").textContent = L ? (L.temp >= 38 ? "Fever" : L.temp >= 37.5 ? "Slightly warm" : "Normal") : "--";
+  $("sTempFoot").textContent = L && L.temp != null ? (L.temp >= 38 ? "Fever" : L.temp >= 37.5 ? "Slightly warm" : "Normal") : "--";
 
   if (d.measuring) {
     $("insights").innerHTML = d.insights.map(c =>

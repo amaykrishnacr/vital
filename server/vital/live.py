@@ -164,7 +164,7 @@ def process(payload, ip):
             ul.alert_text = a["kind"].replace("_", " ").upper()
 
     alert_on = now < ul.alert_until
-    return {"ok": True, "user": user["name"], "alert": alert_on,
+    return {"ok": True, "user": user["name"], "alert": alert_on, "temp": r["temp"] if finger else None,
             "msg": ("ALERT " + ul.alert_text) if alert_on else ("Place finger" if not finger else "OK"),
             "quality": round(q)}
 

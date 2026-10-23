@@ -10,13 +10,7 @@ VITAL (Vitals Intelligence, Tracking & Anomaly Learning) reads heart rate, blood
 - sends emergency alerts on Telegram
 - publishes anonymised, ward-level summaries for a smart city platform
 
-| User page (Simple mode, during an alert) | Admin monitoring station |
-|---|---|
-| ![User page](docs/screenshots/user-simple-alert.png) | ![Admin station](docs/screenshots/admin-station.png) |
-| **Detailed mode** | **City view** |
-| ![Detailed mode](docs/screenshots/user-detailed.png) | ![City view](docs/screenshots/city-view.png) |
-
-This repository contains the **software**: the server, the website, the machine learning and a **fake ESP32** for testing without hardware. The ESP32 firmware goes in `firmware/`.
+This repository contains the server, the website, the machine learning, a **fake ESP32** for testing without hardware, and the **ESP32 firmware** in `firmware/`. The presentation is in `docs/`.
 
 ---
 
@@ -47,7 +41,10 @@ vital/
 │   └── static/            ← CSS, JavaScript, Chart.js (works offline)
 ├── simulator/
 │   └── fake_esp32.py      ← pretends to be the device, with demo scenarios
-└── firmware/              ← ESP32 code (Arduino IDE)
+├── firmware/
+│   ├── sensor_test/       ← upload first: checks the wiring
+│   └── vital_firmware/    ← the real device code (edit config.h)
+└── docs/                  ← presentation and screenshots
 ```
 
 ---
@@ -151,9 +148,11 @@ VITAL is a wellness and early-warning tool, **not a medical device**.
 
 ---
 
-## Connecting the real ESP32 later
+## Connecting the real ESP32
 
-The device sends one JSON message per second:
+Step-by-step instructions are in **[firmware/README.md](firmware/README.md)**: board setup, libraries, the wiring test sketch, and what to put in `config.h`. Start the server first, copy the `SERVER_URL` it prints into `config.h`, upload, then log in and press **Start measurement**.
+
+For reference, the device sends one JSON message per second:
 
 ```
 POST http://<laptop-ip>:5000/api/reading
@@ -166,7 +165,7 @@ Header:  X-Device-Key: vital-device-key        (DEVICE_KEY in config.py)
 }
 ```
 
-`temp` is the raw MLX90614 object (skin) temperature; the server adds the calibration offset. The reply tells the device what to show on the OLED, for example `{"user": "Member 1", "alert": true, "msg": "ALERT LOW SPO2"}`.
+`temp` is the raw MLX90614 object (skin) temperature; the server adds the calibration offset. The reply tells the device what to show on the OLED, for example `{"user": "Member 1", "alert": true, "temp": 36.7, "msg": "ALERT LOW SPO2"}`.
 
 > The ESP32 only connects to **2.4 GHz** Wi-Fi. On a phone hotspot, turn on "Maximise compatibility" / 2.4 GHz.
 

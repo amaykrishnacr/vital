@@ -26,11 +26,12 @@ def status(latest, anomaly, predictions, active_alert, quality=None):
     if quality is not None and quality < 40:
         return {"level": "watch", "text": "Poor signal"}
     if latest:
-        if latest["spo2"] < 92 or latest["bpm"] > 120 or latest["bpm"] < 45 or latest["temp"] >= 38.0:
+        t = latest.get("temp") or 0
+        if latest["spo2"] < 92 or latest["bpm"] > 120 or latest["bpm"] < 45 or t >= 38.0:
             return {"level": "check", "text": "Check this"}
     if predictions or (anomaly is not None and anomaly >= 0.6):
         return {"level": "watch", "text": "Keep an eye"}
-    if latest and (latest["spo2"] < 95 or latest["bpm"] > 100 or latest["temp"] >= 37.5):
+    if latest and (latest["spo2"] < 95 or latest["bpm"] > 100 or (latest.get("temp") or 0) >= 37.5):
         return {"level": "watch", "text": "Keep an eye"}
     return {"level": "good", "text": "All good"}
 
@@ -73,8 +74,11 @@ def cards(latest, base, state, predictions, quality):
         out.append({"tone": "cyan", "title": "Oxygen looks great",
                     "text": "Your blood oxygen is in the healthy range (95% and above)."})
 
-    t, bt = latest["temp"], base["temp_mean"]
-    if t >= 38.0:
+    t, bt = latest.get("temp"), base["temp_mean"]
+    if t is None:
+        out.append({"tone": "amber", "title": "Temperature not available",
+                    "text": "The temperature sensor isn't responding. Check the GY-906 wiring."})
+    elif t >= 38.0:
         out.append({"tone": "red", "title": "You may have a fever",
                     "text": f"{t:.1f} °C. Rest, drink water and check with a thermometer."})
     elif t > bt + 0.4:
