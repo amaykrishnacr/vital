@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Live{% endblock %}
+{% block topright %}
+<div class="toggle" id="modeToggle">
+  <button data-mode="simple">Simple</button>
+  <button data-mode="detailed">Detailed</button>
+</div>
+{% endblock %}
+{% block content %}
+<div class="banner hidden" id="banner"><b>ALERT</b><span id="bannerText"></span></div>
+
+<div class="page-head">
+  <div>
+    <h1 id="greeting">Hello, {{ user.name }}</h1>
+    <p id="subtitle">Connecting…</p>
+  </div>
+  <div class="spacer"></div>
+  <div class="pill idle" id="pill"><span class="dot"></span><span id="pillText">Not measuring</span></div>
+  <button class="btn primary" id="startBtn">▶ Start measurement</button>
+  <button class="btn danger hidden" id="stopBtn">■ Stop</button>
+</div>
+
+<!-- ===================== SIMPLE MODE ===================== -->
+<section id="simple">
+  <div class="grid" style="grid-template-columns: 1fr 470px;">
+    <div class="panel screen" style="height: 380px; padding: 0;">
+      <div class="label c-green" style="position:absolute;left:22px;top:18px;z-index:2">Pulse wave</div>
+      <svg class="heart" id="heart" viewBox="0 0 32 30"><path d="M16 28C-8 12 2-4 16 6 30-4 40 12 16 28z" fill="currentColor"/></svg>
+      <canvas class="monitor" id="waveSimple"></canvas>
+      <div class="empty" id="emptySimple"><div><b>Not measuring right now</b>Press <i>Start measurement</i>, then rest your fingertip gently on the sensor.</div></div>
+    </div>
+    <div class="grid" style="grid-template-rows: 1fr 1fr; grid-template-columns: 1fr 1fr;">
+      <div class="panel tile" style="grid-column: span 2;">
+        <div class="label c-green">Heart rate</div>
+        <div style="margin-top:22px"><span class="value c-green" style="font-size:78px" id="sHr">--</span><span class="unit">bpm</span></div>
+        <div class="foot" id="sHrFoot">Your usual resting: --</div>
+      </div>
+      <div class="panel tile">
+        <div class="label c-cyan">SpO₂</div>
+        <div style="margin-top:16px"><span class="value c-cyan" style="font-size:54px" id="sSpo2">--</span><span class="unit">%</span></div>
+        <div class="foot" id="sSpo2Foot">--</div>
+      </div>
+      <div class="panel tile">
+        <div class="label c-amber">Temp</div>
+        <div style="margin-top:16px"><span class="value c-amber" style="font-size:54px" id="sTemp">--</span><span class="unit">°C</span></div>
+        <div class="foot" id="sTempFoot">--</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: 1fr 470px; margin-top: 22px;">
+    <div>
+      <div class="section-title">What VITAL noticed</div>
+      <div class="grid" id="insights" style="gap:10px">
+        <div class="insight"><div class="ring tone-cyan"></div><div><b>Ready when you are</b><span>Start a measurement and VITAL will explain your readings in plain words.</span></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="label">Resting pulse · last 7 days</div>
+      <div style="height:250px;margin-top:10px"><canvas id="restChart"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== DETAILED MODE ===================== -->
+<section id="detailed" class="hidden">
+  <div class="grid" style="grid-template-columns: 1fr 440px;">
+    <div class="grid">
+      <div class="panel screen" style="height: 205px; padding: 0;">
+        <div class="label c-green" style="position:absolute;left:20px;top:14px;z-index:2">IR channel · raw <span id="dIrRaw">--</span></div>
+        <canvas class="monitor" id="waveIr"></canvas>
+      </div>
+      <div class="panel screen" style="height: 205px; padding: 0;">
+        <div class="label c-red" style="position:absolute;left:20px;top:14px;z-index:2">Red channel · raw <span id="dRedRaw">--</span></div>
+        <canvas class="monitor" id="waveRed"></canvas>
+      </div>
+    </div>
+    <div class="panel tile">
+      <div class="label">Heart rate</div><div class="value c-green" style="font-size:44px;margin:8px 0 16px" id="dHr">-- bpm</div>
+      <div class="label">SpO₂</div><div class="value c-cyan" style="font-size:44px;margin:8px 0 16px" id="dSpo2">-- %</div>
+      <div class="label">Body temp <span class="dim" style="letter-spacing:0;text-transform:none">(skin + offset)</span></div>
+      <div class="value c-amber" style="font-size:44px;margin:8px 0 6px" id="dTemp">-- °C</div>
+      <div class="kv"><span>Skin (object) temp</span><span id="dSkin">--</span></div>
+      <div class="kv"><span>Ambient temp</span><span id="dAmb">--</span></div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: 1.1fr 1.1fr .8fr; margin-top: 16px;">
+    <div class="panel">
+      <div class="label c-violet">ML engine · <span id="dSource">--</span></div>
+      <div style="margin-top:14px">
+        <div class="kv" style="border:0"><span>Anomaly score</span><span id="dAnom">--</span></div>
+        <div class="bar"><i id="dAnomBar" style="width:0;background:var(--green)"></i></div>
+        <div class="kv" style="border:0;margin-top:8px"><span>Signal quality</span><span id="dQual">--</span></div>
+        <div class="bar"><i id="dQualBar" style="width:0;background:var(--cyan)"></i></div>
+        <div class="kv" style="border:0;margin-top:8px"><span>State: <b id="dState" style="color:var(--text)">--</b></span><span id="dStateConf">--</span></div>
+        <div class="bar"><i id="dStateBar" style="width:0;background:var(--violet)"></i></div>
+      </div>
+      <div class="mono dim" style="font-size:12px;margin-top:14px" id="dBaseline">baseline --</div>
+    </div>
+    <div class="panel">
+      <div class="label c-amber">Trend prediction · temperature</div>
+      <div style="height:170px;margin-top:8px"><canvas id="trendChart"></canvas></div>
+      <div id="dPred" class="mono" style="font-size:13px;margin-top:8px;color:var(--muted)">Needs 2 minutes of readings.</div>
+    </div>
+    <div class="panel">
+      <div class="label">Device</div>
+      <div style="margin-top:10px" id="dDevice">
+        <div class="kv"><span>Status</span><span id="dvStatus">--</span></div>
+        <div class="kv"><span>Wi-Fi RSSI</span><span id="dvRssi">--</span></div>
+        <div class="kv"><span>Sample rate</span><span id="dvRate">--</span></div>
+        <div class="kv"><span>Last packet</span><span id="dvLast">--</span></div>
+        <div class="kv"><span>Firmware</span><span id="dvFw">--</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+const h = new Date().getHours();
+$("greeting").textContent = (h < 12 ? "Good morning, " : h < 17 ? "Good afternoon, " : "Good evening, ") + {{ user.name|tojson }};
+
+// ---------- mode toggle (remembered per browser) ----------
+let mode = "simple";
+try { mode = localStorage.getItem("vital-mode") || "simple"; } catch (e) {}
+function setMode(m) {
+  mode = m;
+  try { localStorage.setItem("vital-mode", m); } catch (e) {}
+  document.querySelectorAll("#modeToggle button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
+  $("simple").classList.toggle("hidden", m !== "simple");
+  $("detailed").classList.toggle("hidden", m !== "detailed");
+}
+document.querySelectorAll("#modeToggle button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+setMode(mode);
+
+// ---------- monitors ----------
+const mSimple = new Monitor($("waveSimple"), { color: "#2BE38A", seconds: 6 });
+const mIr = new Monitor($("waveIr"), { color: "#2BE38A", seconds: 6, grid: 32 });
+const mRed = new Monitor($("waveRed"), { color: "#FF5470", seconds: 6, grid: 32 });
+[mSimple, mIr, mRed].forEach(m => m.start());
+const seen = {};
+
+// ---------- charts ----------
+Chart.defaults.color = "#8A9BB4"; Chart.defaults.borderColor = "#1A2740";
+Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+const restChart = new Chart($("restChart"), {
+  type: "bar",
+  data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 8 }] },
+  options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+             scales: { y: { min: 40, grid: { color: "#1A2740" } }, x: { grid: { display: false } } } },
+});
+const trendChart = new Chart($("trendChart"), {
+  type: "line",
+  data: { datasets: [
+    { label: "measured", data: [], borderColor: "#E6EDF5", pointRadius: 0, borderWidth: 2 },
+    { label: "trend", data: [], borderColor: "#FFB23F", borderDash: [6, 5], pointRadius: 0, borderWidth: 2 },
+    { label: "limit", data: [], borderColor: "#FF5470", borderDash: [3, 4], pointRadius: 0, borderWidth: 1.5 },
+  ] },
+  options: { maintainAspectRatio: false, animation: false, parsing: false, plugins: { legend: { display: false } },
+             scales: { x: { type: "linear", min: -10, max: 15, title: { display: true, text: "minutes" } },
+                       y: { suggestedMin: 36, suggestedMax: 38.4 } } },
+});
+
+async function loadHistory() {
+  try {
+    const d = await api("/api/history/me?days=7");
+    const days = d.daily.slice(-7);
+    restChart.data.labels = days.map(x => new Date(x.d + "T00:00").toLocaleDateString([], { weekday: "short" }));
+    restChart.data.datasets[0].data = days.map(x => x.resting_hr ? +x.resting_hr.toFixed(1) : null);
+    restChart.data.datasets[0].backgroundColor = days.map((x, i) => i === days.length - 1 ? "#2BE38A" : "#1F6B4A");
+    restChart.update();
+  } catch (e) {}
+}
+loadHistory(); setInterval(loadHistory, 60000);
+
+// ---------- start / stop ----------
+$("startBtn").onclick = async () => {
+  try { await api("/api/session/start", { body: {} }); toast("Measurement started. Place your finger on the sensor."); }
+  catch (e) { toast(e.message, true); }
+  poll();
+};
+$("stopBtn").onclick = async () => { await api("/api/session/stop", { body: {} }); [mSimple, mIr, mRed].forEach(m => m.clear()); poll(); };
+
+// ---------- live polling ----------
+function setWidth(el, frac, color) { el.style.width = Math.max(0, Math.min(1, frac || 0)) * 100 + "%"; if (color) el.style.background = color; }
+
+function render(d) {
+  const raw = d.latest, L = raw && raw.finger && raw.bpm ? raw : null, b = d.ml.baseline;
+  $("startBtn").classList.toggle("hidden", !!d.session);
+  $("stopBtn").classList.toggle("hidden", !d.session);
+  $("subtitle").textContent = d.measuring ? (!L ? "Place your finger on the sensor" : "Finger on the sensor · measuring live")
+    : d.session ? "Waiting for the device…" : (d.last_seen ? "Last measured " + fmt.ago(d.last_seen.ts) : "No measurements yet");
+  $("pill").className = "pill " + d.status.level; $("pillText").textContent = d.status.text;
+  $("banner").classList.toggle("hidden", !d.alert.on);
+  if (d.alert.on) $("bannerText").textContent = (d.recent_alerts[0] || {}).reason || d.alert.text;
+
+  // waveforms
+  feed(mSimple, d.wave.ir, seen, "s"); feed(mIr, d.wave.ir, seen, "ir"); feed(mRed, d.wave.red, seen, "red");
+  $("emptySimple").classList.toggle("hidden", d.measuring);
+  const beat = L && L.bpm ? 60 / L.bpm : 0;
+  $("heart").classList.toggle("beat", !!beat); if (beat) $("heart").style.setProperty("--beat", beat + "s");
+
+  // simple tiles
+  $("sHr").textContent = L ? fmt.n(L.bpm) : "--";
+  $("sSpo2").textContent = L ? fmt.n(L.spo2) : "--";
+  $("sTemp").textContent = L ? fmt.n(L.temp, 1) : "--";
+  $("sHrFoot").textContent = `Your usual resting: ${fmt.n(b.hr_lo)}–${fmt.n(b.hr_hi)}`;
+  $("sSpo2Foot").textContent = L ? (L.spo2 >= 95 ? "Healthy" : L.spo2 >= 90 ? "A little low" : "Low") : "--";
+  $("sTempFoot").textContent = L ? (L.temp >= 38 ? "Fever" : L.temp >= 37.5 ? "Slightly warm" : "Normal") : "--";
+
+  if (d.measuring) {
+    $("insights").innerHTML = d.insights.map(c =>
+      `<div class="insight"><div class="ring tone-${c.tone}"></div><div><b>${fmt.esc(c.title)}</b><span>${fmt.esc(c.text)}</span></div></div>`).join("");
+  }
+
+  // detailed
+  $("dIrRaw").textContent = L && L.ir ? Number(L.ir).toLocaleString() : "--";
+  $("dRedRaw").textContent = L && L.red ? Number(L.red).toLocaleString() : "--";
+  $("dHr").textContent = L ? fmt.n(L.bpm, 1) + " bpm" : "-- bpm";
+  $("dSpo2").textContent = L ? fmt.n(L.spo2, 1) + " %" : "-- %";
+  $("dTemp").textContent = L ? fmt.n(L.temp, 2) + " °C" : "-- °C";
+  $("dSkin").textContent = L && L.skin != null ? fmt.n(L.skin, 2) + " °C" : "--";
+  $("dAmb").textContent = L && L.ambient != null ? fmt.n(L.ambient, 2) + " °C" : "--";
+
+  const ml = d.ml;
+  $("dSource").textContent = ml.model.personal ? `personal model (${ml.model.n} windows)` : "population rules (learning you)";
+  const an = ml.anomaly;
+  $("dAnom").textContent = an == null ? "--" : an.toFixed(2) + " / 1.00";
+  setWidth($("dAnomBar"), an, an >= .7 ? "var(--red)" : an >= .5 ? "var(--amber)" : "var(--green)");
+  $("dQual").textContent = ml.quality == null ? "--" : Math.round(ml.quality) + " %";
+  setWidth($("dQualBar"), (ml.quality || 0) / 100);
+  $("dState").textContent = ml.state || "--";
+  $("dStateConf").textContent = ml.state_conf == null ? "--" : "confidence " + Math.round(ml.state_conf * 100) + " %";
+  setWidth($("dStateBar"), ml.state_conf);
+  $("dBaseline").textContent = `baseline HR μ=${fmt.n(b.hr_mean, 1)} σ=${fmt.n(b.hr_std, 1)} · temp ${fmt.n(b.temp_mean, 2)} °C · SpO₂ ${fmt.n(b.spo2_mean, 1)} % · n=${b.n}`;
+
+  const tr = ml.trend_temp;
+  if (tr) {
+    trendChart.data.datasets[0].data = tr.t.map((t, i) => ({ x: t, y: tr.y[i] }));
+    trendChart.data.datasets[1].data = [{ x: tr.t[0], y: tr.a + tr.b * tr.t[0] }, { x: 15, y: tr.a + tr.b * 15 }];
+  } else { trendChart.data.datasets[0].data = []; trendChart.data.datasets[1].data = []; }
+  trendChart.data.datasets[2].data = [{ x: -10, y: 38 }, { x: 15, y: 38 }];
+  trendChart.update();
+  $("dPred").innerHTML = d.predictions.length ? d.predictions.map(p => `<div class="c-red">▲ ${fmt.esc(p.text)}</div>`).join("")
+    : tr ? `slope ${tr.b >= 0 ? "+" : ""}${tr.b.toFixed(3)} °C/min · no limit crossed in 15 min` : "Needs 2 minutes of readings.";
+
+  const dv = d.device;
+  $("dvStatus").innerHTML = dv ? (dv.online ? '<span class="c-green">ONLINE</span>' : '<span class="c-red">OFFLINE</span>') : "--";
+  $("dvRssi").textContent = dv && dv.rssi != null ? dv.rssi + " dBm" : "--";
+  $("dvRate").textContent = dv ? dv.rate + " Hz" : "--";
+  $("dvLast").textContent = dv ? dv.last_packet_s + " s ago" : "--";
+  $("dvFw").textContent = dv ? dv.fw : "--";
+}
+
+let busy = false;
+async function poll() {
+  if (busy) return; busy = true;
+  try {
+    const since = seen.ir != null ? seen.ir + 1 : "";
+    render(await api("/api/live/me" + (since !== "" ? "?since=" + since : "")));
+  } catch (e) { $("subtitle").textContent = "Server not reachable…"; }
+  busy = false;
+}
+poll(); setInterval(poll, 1000);
+</script>
+{% endblock %}

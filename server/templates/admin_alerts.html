@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Alerts{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Alerts</h1><p>Every alert and early warning VITAL has raised, newest first.</p></div>
+  <div class="spacer"></div>
+  <select id="filter" style="width:auto"><option value="">All</option><option value="open">Not acknowledged</option>
+    <option value="critical">Critical only</option><option value="warning">Warnings only</option></select>
+  <button class="btn" id="ackAll">Acknowledge all</button>
+</div>
+<div class="panel" style="padding:6px 8px">
+  <table class="t">
+    <thead><tr><th>Time</th><th>Level</th><th>Person</th><th>What happened</th><th>Telegram</th><th></th></tr></thead>
+    <tbody id="rows"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+async function load() {
+  const d = await api("/api/admin/alerts"), f = $("filter").value;
+  const rows = d.alerts.filter(a => !f || (f === "open" ? !a.acknowledged : a.level === f));
+  $("rows").innerHTML = rows.map(a => `<tr style="${a.acknowledged ? "opacity:.55" : ""}">
+    <td class="mono" style="white-space:nowrap">${fmt.dt(a.ts)}</td>
+    <td><span class="tag ${a.level}">${a.level}</span></td>
+    <td><b>${fmt.esc(a.user_name)}</b><div class="dim" style="font-size:12px">${fmt.esc(a.ward || "")}</div></td>
+    <td>${fmt.esc(a.reason)}</td>
+    <td>${a.delivered ? '<span class="tag ok">sent</span>' : '<span class="tag off" title="' + fmt.esc(a.sent_to) + '">not sent</span>'}
+        <div class="dim" style="font-size:12px;max-width:220px">${fmt.esc(a.sent_to || "")}</div></td>
+    <td>${a.acknowledged ? '<span class="dim">acknowledged</span>' : `<button class="btn small" onclick="ack(${a.id})">Acknowledge</button>`}</td>
+  </tr>`).join("") || '<tr><td colspan="6" class="muted">No alerts.</td></tr>';
+}
+async function ack(id) { await api(`/api/admin/alerts/${id}/ack`, { body: {} }); load(); }
+$("ackAll").onclick = async () => { await api("/api/admin/alerts/ack_all", { body: {} }); load(); };
+$("filter").onchange = load;
+load(); setInterval(load, 5000);
+</script>
+{% endblock %}

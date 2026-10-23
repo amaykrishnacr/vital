@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Monitoring station{% endblock %}
+{% block content %}
+<style>
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); gap: 16px; }
+  .ut { padding: 18px 20px; }
+  .ut.alert { background: #1E0F18; border: 2px solid var(--red); animation: glowRed 1.2s infinite; }
+  @keyframes glowRed { 50% { box-shadow: 0 0 0 5px rgba(255, 84, 112, .15); } }
+  .ut .top { display: flex; align-items: center; gap: 10px; }
+  .ut .top b { font-size: 20px; }
+  .live-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+  .ut .scr { height: 96px; margin: 12px 0; border-radius: 10px; background: #08101C; position: relative; overflow: hidden; }
+  .ut .nums { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+  .ut .nums .v { font-family: var(--mono); font-size: 38px; font-weight: 700; }
+  .ut .why { margin-top: 10px; font-size: 14px; min-height: 20px; }
+  .stat .v { font-family: var(--mono); font-size: 30px; font-weight: 700; }
+</style>
+
+<div class="page-head">
+  <div><h1>Monitoring station</h1><p id="sub">Loading…</p></div>
+</div>
+
+<div class="grid" style="grid-template-columns: repeat(4, 1fr) 2fr; margin-bottom: 18px;">
+  <div class="panel stat"><div class="label">Users</div><div class="v" id="stUsers">--</div></div>
+  <div class="panel stat"><div class="label c-green">Measuring now</div><div class="v c-green" id="stLive">--</div></div>
+  <div class="panel stat"><div class="label c-red">Open alerts</div><div class="v c-red" id="stAlerts">--</div></div>
+  <div class="panel stat"><div class="label c-cyan">Devices online</div><div class="v c-cyan" id="stDev">--</div></div>
+  <div class="panel">
+    <div class="label c-violet">Demo · simulator scenario</div>
+    <div style="display:flex;gap:10px;margin-top:10px;align-items:center">
+      <select id="scenario" style="flex:1;min-width:220px"></select>
+      <span class="dim" style="font-size:12px;max-width:150px">Only affects the fake ESP32, not real hardware.</span>
+    </div>
+  </div>
+</div>
+
+<div class="tiles" id="tiles"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+const monitors = {}, seen = {};
+const NAMES = { normal: "Normal resting", exercise: "After exercise", fever: "Developing fever", low_oxygen: "Oxygen dropping",
+                high_hr: "High heart rate at rest", noisy: "Moving finger (bad signal)", no_finger: "No finger on sensor" };
+
+function tileHTML(t) {
+  const id = t.user.id;
+  return `<div class="panel ut" id="tile${id}">
+    <div class="top"><b>${fmt.esc(t.user.name)}</b><span class="dim">· ${fmt.esc(t.user.ward)}</span><span class="spacer"></span>
+      <span id="lv${id}" style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px"></span></div>
+    <div class="scr"><canvas class="monitor" id="cv${id}"></canvas>
+      <div class="empty dim" id="em${id}" style="font-size:14px"></div></div>
+    <div class="nums">
+      <div><div class="label">HR</div><div class="v c-green" id="hr${id}">--</div></div>
+      <div><div class="label">SpO₂</div><div class="v c-cyan" id="sp${id}">--</div></div>
+      <div><div class="label">Temp</div><div class="v c-amber" id="tp${id}">--</div></div>
+    </div>
+    <div class="why" id="why${id}"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn small hidden" id="ack${id}">Acknowledge alert</button>
+      <button class="btn small hidden" id="stop${id}">Stop session</button>
+      <span class="spacer"></span><span class="dim mono" style="font-size:12px" id="an${id}"></span>
+    </div></div>`;
+}
+
+function update(t) {
+  const id = t.user.id;
+  if (!monitors[id]) {
+    $("tiles").insertAdjacentHTML("beforeend", tileHTML(t));
+    monitors[id] = new Monitor($("cv" + id), { seconds: 5, grid: 24 }); monitors[id].start();
+    $("stop" + id).onclick = async () => { await api(`/api/admin/session/${id}/stop`, { body: {} }); monitors[id].clear(); };
+  }
+  const alertOn = !!t.open_alert || t.alert.on;
+  $("tile" + id).classList.toggle("alert", alertOn);
+  monitors[id].color = alertOn ? "#FF5470" : "#2BE38A";
+  if (t.measuring) feed(monitors[id], t.wave.ir, seen, id); else monitors[id].clear();
+  $("em" + id).classList.toggle("hidden", t.measuring);
+  $("em" + id).textContent = t.session ? "Waiting for device…" : "Last seen " + fmt.ago(t.last_seen && t.last_seen.ts);
+  const src = t.measuring ? (t.latest && t.latest.finger && t.latest.bpm ? t.latest : null) : t.last_seen;
+  $("hr" + id).textContent = src ? fmt.n(src.bpm) : "--";
+  $("sp" + id).textContent = src ? fmt.n(src.spo2) : "--";
+  $("tp" + id).textContent = src ? fmt.n(src.temp, 1) : "--";
+  ["hr", "sp", "tp"].forEach(k => $(k + id).style.opacity = t.measuring ? 1 : .45);
+  $("lv" + id).innerHTML = alertOn ? '<span class="c-red" style="display:flex;gap:8px;align-items:center">ALERT <span class="live-dot"></span></span>'
+    : t.measuring ? '<span class="c-green" style="display:flex;gap:8px;align-items:center">LIVE <span class="live-dot"></span></span>'
+    : '<span class="dim">OFFLINE</span>';
+  let why = "";
+  if (t.open_alert) why = `<span class="c-red" style="font-weight:700">${fmt.esc(t.open_alert.reason)}</span> <span class="dim">· ${fmt.ago(t.open_alert.ts)}</span>`;
+  else if (t.predictions.length) why = `<span class="c-amber">⚠ ${fmt.esc(t.predictions[0].text)}</span>`;
+  else if (t.measuring) why = `<span class="muted">${fmt.esc(t.status.text)}${t.ml.state ? " · " + t.ml.state : ""}</span>`;
+  $("why" + id).innerHTML = why;
+  $("an" + id).textContent = t.ml.anomaly != null ? "anomaly " + t.ml.anomaly.toFixed(2) : "";
+  const ack = $("ack" + id);
+  ack.classList.toggle("hidden", !t.open_alert);
+  if (t.open_alert) ack.onclick = async () => { await api(`/api/admin/alerts/${t.open_alert.id}/ack`, { body: {} }); poll(); };
+  $("stop" + id).classList.toggle("hidden", !t.session);
+}
+
+let scenarioInit = false;
+async function poll() {
+  try {
+    const d = await api("/api/admin/overview");
+    d.tiles.forEach(update);
+    $("stUsers").textContent = d.tiles.length;
+    $("stLive").textContent = d.tiles.filter(t => t.measuring).length;
+    $("stAlerts").textContent = d.unacknowledged;
+    $("stDev").textContent = d.devices.filter(x => x.online).length + " / " + d.devices.length;
+    $("sub").textContent = `${d.tiles.length} users · ${d.devices.filter(x => x.online).length} device online · ` +
+      `Telegram ${d.telegram ? "connected" : "not configured"}`;
+    if (!scenarioInit) {
+      $("scenario").innerHTML = d.scenarios.map(s => `<option value="${s}">${NAMES[s] || s}</option>`).join("");
+      $("scenario").value = d.scenario; scenarioInit = true;
+      $("scenario").onchange = async e => {
+        await api("/api/demo/scenario", { body: { scenario: e.target.value } });
+        toast("Simulator scenario: " + NAMES[e.target.value]);
+      };
+    }
+  } catch (e) { $("sub").textContent = "Server not reachable…"; }
+}
+poll(); setInterval(poll, 1000);
+</script>
+{% endblock %}

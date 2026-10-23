@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}City view{% endblock %}
+{% block content %}
+<style>
+  .map { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .ward { border-radius: 14px; padding: 16px; cursor: pointer; border: 2px solid transparent; min-height: 132px; position: relative; transition: transform .15s; }
+  .ward:hover { transform: translateY(-2px); }
+  .ward.sel { border-color: var(--text); }
+  .ward h3 { margin: 0 0 6px; font-size: 17px; }
+  .ward .big { font-family: var(--mono); font-size: 30px; font-weight: 700; }
+  .ward .hub { position: absolute; right: 12px; top: 12px; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 3px 8px; border-radius: 8px; background: rgba(0,0,0,.35); }
+  .legend { display: flex; gap: 14px; align-items: center; font-size: 13px; color: var(--muted); margin-top: 12px; }
+  .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 6px; }
+  pre.json { background: #070D18; border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 12.5px; overflow: auto; margin: 8px 0 0; color: var(--text); }
+</style>
+<div class="page-head">
+  <div><h1>City view · {{ city }}</h1>
+    <p>What VITAL hubs would publish to the city's health platform: anonymised ward-level counts for the last hour. Wards without a real hub are simulated.</p></div>
+</div>
+
+<div class="grid" style="grid-template-columns: repeat(5, 1fr); margin-bottom: 16px;" id="totals"></div>
+
+<div class="grid" style="grid-template-columns: 1.55fr 1fr;">
+  <div class="panel">
+    <div class="label">Ward health map · fever rate in the last hour</div>
+    <div class="map" id="map" style="margin-top:14px"></div>
+    <div class="legend"><span><i style="background:#173B2C"></i>under 5 %</span><span><i style="background:#3B3317"></i>5–10 %</span>
+      <span><i style="background:#4A1624"></i>10 % and above (cluster)</span><span><i style="background:var(--panel2)"></i>merged (too few people)</span>
+      <span class="spacer"></span><span><b class="c-cyan">REAL</b> = this VITAL server</span></div>
+  </div>
+  <div class="panel">
+    <div class="label c-cyan" id="selTitle">Ward details</div>
+    <div id="sel" style="margin-top:10px"></div>
+    <div class="label c-violet" style="margin-top:16px">MQTT message published for this ward</div>
+    <div class="mono dim" style="font-size:12px;margin-top:6px" id="topic"></div>
+    <pre class="json" id="payload"></pre>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:16px">
+  <div class="label c-amber">Privacy rules applied</div>
+  <div class="grid" style="grid-template-columns: repeat(3, 1fr); margin-top: 10px; font-size: 14px;">
+    <div><b>No personal data</b><div class="muted">Only counts and averages per ward. No names, device IDs or raw signals leave the hub.</div></div>
+    <div><b>Small groups merged</b><div class="muted">Wards with fewer than <span id="minGroup">10</span> people are merged into the city total, so nobody can be singled out.</div></div>
+    <div><b>Emergencies only with consent</b><div class="muted">Name, location and the last 5 minutes go to 108 / hospital only for a critical alert, and only if the user agreed.</div></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+let selected = "Ward 5", snap = null;
+const colorFor = w => w.merged ? "var(--panel2)" : w.fever_rate >= .10 ? "#4A1624" : w.fever_rate >= .05 ? "#3B3317" : "#173B2C";
+const textFor = w => w.merged ? "var(--muted)" : w.fever_rate >= .10 ? "var(--red)" : w.fever_rate >= .05 ? "var(--amber)" : "var(--green)";
+
+function render() {
+  const t = snap.totals;
+  $("minGroup").textContent = snap.min_group;
+  $("totals").innerHTML = [["VITAL hubs", t.hubs, "c-cyan"], ["People covered", t.people, ""], ["Readings (1 h)", t.readings.toLocaleString(), "c-green"],
+    ["Fever cases (1 h)", t.fevers, "c-amber"], ["Critical alerts (1 h)", t.alerts, "c-red"]].map(([l, v, c]) =>
+    `<div class="panel"><div class="label ${c}">${l}</div><div class="mono ${c}" style="font-size:28px;font-weight:700;margin-top:6px">${v}</div></div>`).join("");
+  $("map").innerHTML = snap.wards.map(w => `<div class="ward ${w.ward === selected ? "sel" : ""}" data-w="${w.ward}" style="background:${colorFor(w)}">
+    ${w.has_vital_hub ? '<span class="hub c-cyan">REAL</span>' : ""}
+    <h3>${w.ward}</h3>
+    ${w.merged ? '<div class="muted" style="font-size:13px;margin-top:10px">Merged: fewer than ' + snap.min_group + ' people</div>' :
+      `<div class="big" style="color:${textFor(w)}">${(w.fever_rate * 100).toFixed(0)}%</div>
+       <div class="muted" style="font-size:13px">${w.fevers} fever${w.fevers === 1 ? "" : "s"} · ${w.people} people${w.cluster ? ' · <b class="c-red">cluster</b>' : ""}</div>`}
+  </div>`).join("");
+  $("map").querySelectorAll(".ward").forEach(el => el.onclick = () => { selected = el.dataset.w; render(); });
+  const i = snap.wards.findIndex(w => w.ward === selected), w = snap.wards[i], m = snap.messages[i];
+  $("selTitle").textContent = w.ward + (w.cluster ? " · possible outbreak" : "");
+  $("sel").innerHTML = w.merged ? '<div class="muted">Too few people in this ward to publish separately.</div>' : `
+    <div class="kv"><span>VITAL hubs</span><span>${w.hubs}</span></div>
+    <div class="kv"><span>People covered</span><span>${w.people}</span></div>
+    <div class="kv"><span>Readings last hour</span><span>${w.readings.toLocaleString()}</span></div>
+    <div class="kv"><span>Fever cases (≥ ${snap.fever_c} °C)</span><span class="${w.cluster ? "c-red" : ""}">${w.fevers}</span></div>
+    <div class="kv"><span>Critical alerts</span><span>${w.alerts}</span></div>
+    <div class="kv"><span>Average HR / SpO₂ / temp</span><span>${w.avg_hr} · ${w.avg_spo2} · ${w.avg_temp}</span></div>
+    ${w.cluster ? '<div class="banner" style="margin:12px 0 0;font-size:14px"><b>SIGNAL</b><span>Fever rate above 10 %: the city health office would be notified to investigate.</span></div>' : ""}`;
+  $("topic").textContent = "topic: " + m.topic + "  ·  QoS " + m.qos;
+  $("payload").textContent = JSON.stringify(m.payload, null, 2);
+}
+async function load() { snap = await api("/api/admin/city"); render(); }
+load(); setInterval(load, 10000);
+</script>
+{% endblock %}

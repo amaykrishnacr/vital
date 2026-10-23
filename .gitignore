@@ -1,0 +1,11 @@
+# local data (database, trained models) - each laptop builds its own
+server/data/
+# Python
+.venv/
+__pycache__/
+*.pyc
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

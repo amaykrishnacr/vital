@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<style>
+  .modal { position: fixed; inset: 0; background: rgba(5, 9, 18, .72); display: grid; place-items: center; z-index: 40; padding: 20px; }
+  .modal .panel { width: 520px; max-width: 100%; max-height: 92vh; overflow: auto; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chatlist .kv { cursor: pointer; } .chatlist .kv:hover { color: var(--cyan); }
+</style>
+<div class="page-head">
+  <div><h1>Users</h1><p id="sub">Accounts, emergency contacts, temperature calibration and personal ML models.</p></div>
+  <div class="spacer"></div>
+  <button class="btn primary" id="addBtn">+ Add user</button>
+</div>
+
+<div class="panel" style="padding:6px 8px">
+  <table class="t">
+    <thead><tr><th>Name</th><th>Ward</th><th>Emergency contact (Telegram)</th><th>Temp offset</th><th>Anomaly model</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<div class="panel" style="margin-top:16px">
+  <div class="label c-cyan">Telegram setup</div>
+  <ol class="muted" style="line-height:1.8;margin:10px 0 0;padding-left:20px">
+    <li>In Telegram, message <b>@BotFather</b> → <span class="mono">/newbot</span>, and copy the token into <span class="mono">server/config.py</span> (TELEGRAM_BOT_TOKEN). Restart the server.</li>
+    <li>The emergency contact opens your bot in Telegram and presses <b>Start</b> (or sends any message).</li>
+    <li>Click <b>Edit</b> on a user below, then <b>Find chat ID</b>, and pick that person. Use <b>Test alert</b> to check.</li>
+  </ol>
+  <div id="tgStatus" style="margin-top:10px"></div>
+</div>
+
+<div class="modal hidden" id="modal"><div class="panel" id="modalBody"></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+let data = null;
+
+async function load() {
+  data = await api("/api/admin/users");
+  $("tgStatus").innerHTML = data.telegram ? '<span class="tag ok">Bot token set</span>' : '<span class="tag warning">No bot token in config.py yet</span>';
+  $("rows").innerHTML = data.users.map(u => `<tr>
+    <td><b>${fmt.esc(u.name)}</b> ${u.role === "admin" ? '<span class="tag critical">admin</span>' : ""}
+        <div class="dim mono" style="font-size:12px">${fmt.esc(u.username)}${u.measuring ? ' · <span class="c-green">measuring</span>' : ""}</div></td>
+    <td>${fmt.esc(u.ward)}</td>
+    <td>${u.role === "admin" ? '<span class="dim">-</span>' : u.emergency_chat
+        ? `${fmt.esc(u.emergency_name || "Contact")} <span class="dim mono" style="font-size:12px">${fmt.esc(u.emergency_chat)}</span>`
+        : '<span class="c-amber">not set</span>'}</td>
+    <td class="mono">${u.role === "admin" ? "-" : "+" + Number(u.temp_offset).toFixed(2) + " °C"}</td>
+    <td>${u.role === "admin" ? '<span class="dim">-</span>' : u.model.personal
+        ? `<span class="tag ok">personal</span> <span class="dim" style="font-size:12px">${u.model.n} windows · ${fmt.ago(u.model.trained_at)}</span>`
+        : `<span class="tag off">learning</span> <span class="dim" style="font-size:12px">${u.windows}/${data.min_windows} windows</span>`}</td>
+    <td style="white-space:nowrap"><button class="btn small" onclick="edit(${u.id})">Edit</button></td></tr>`).join("");
+}
+
+function closeModal() { $("modal").classList.add("hidden"); }
+$("modal").onclick = e => { if (e.target.id === "modal") closeModal(); };
+const wardOptions = sel => data.wards.map(w => `<option ${w === sel ? "selected" : ""}>${w}</option>`).join("");
+
+$("addBtn").onclick = () => {
+  $("modalBody").innerHTML = `<div class="section-title">Add user</div>
+    <div class="row2"><label class="f"><span>Full name</span><input type="text" id="fName"></label>
+      <label class="f"><span>Username</span><input type="text" id="fUser"></label></div>
+    <div class="row2"><label class="f"><span>Password</span><input type="text" id="fPass"></label>
+      <label class="f"><span>Role</span><select id="fRole"><option value="user">User</option><option value="admin">Admin (supervisor)</option></select></label></div>
+    <label class="f"><span>Ward</span><select id="fWard">${wardOptions("Ward 3")}</select></label>
+    <div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" id="save">Create</button></div>`;
+  $("modal").classList.remove("hidden");
+  $("save").onclick = async () => {
+    try {
+      await api("/api/admin/users", { body: { name: $("fName").value, username: $("fUser").value, password: $("fPass").value, role: $("fRole").value, ward: $("fWard").value } });
+      toast("User created"); closeModal(); load();
+    } catch (e) { toast(e.message, true); }
+  };
+};
+
+function edit(id) {
+  const u = data.users.find(x => x.id === id), isUser = u.role !== "admin";
+  $("modalBody").innerHTML = `<div class="section-title">${fmt.esc(u.name)}</div>
+    <div class="row2"><label class="f"><span>Full name</span><input type="text" id="eName" value="${fmt.esc(u.name)}"></label>
+      <label class="f"><span>Ward</span><select id="eWard">${wardOptions(u.ward)}</select></label></div>
+    ${isUser ? `
+    <div class="label c-red" style="margin:6px 0 8px">Emergency contact</div>
+    <div class="row2"><label class="f"><span>Contact name</span><input type="text" id="eCName" value="${fmt.esc(u.emergency_name)}" placeholder="e.g. Mother"></label>
+      <label class="f"><span>Telegram chat ID</span><input type="text" id="eChat" value="${fmt.esc(u.emergency_chat)}" placeholder="e.g. 512345678"></label></div>
+    <div style="display:flex;gap:8px;margin-bottom:8px"><button class="btn small" id="findChat">Find chat ID</button>
+      <button class="btn small" id="testAlert">Send test alert</button></div>
+    <div class="chatlist" id="chatList"></div>
+    <div class="label c-amber" style="margin:14px 0 8px">Temperature calibration</div>
+    <div class="muted" style="font-size:13px;margin-bottom:8px">While this person is measuring, take their temperature with a normal thermometer and enter it here.</div>
+    <div class="row2"><label class="f"><span>Offset (°C)</span><input type="number" step="0.01" id="eOff" value="${Number(u.temp_offset).toFixed(2)}"></label>
+      <label class="f"><span>Thermometer reading now (°C)</span><div style="display:flex;gap:6px"><input type="number" step="0.1" id="eThermo" placeholder="36.8"><button class="btn small" id="calib">Calibrate</button></div></label></div>
+    <div class="label c-violet" style="margin:6px 0 8px">Anomaly model</div>
+    <div class="muted" style="font-size:13px;margin-bottom:8px">${u.model.personal ? `Personal model trained on ${u.model.n} windows (${fmt.ago(u.model.trained_at)}).` : `Learning: ${u.windows} of ${data.min_windows} windows needed.`}</div>
+    <button class="btn small" id="retrain">Retrain now</button>` : ""}
+    <label class="f" style="margin-top:14px"><span>New password (leave empty to keep)</span><input type="text" id="ePass"></label>
+    <div style="display:flex;gap:10px;justify-content:space-between;margin-top:6px">
+      <button class="btn danger small" id="del">Delete user</button>
+      <span><button class="btn" onclick="closeModal()">Cancel</button> <button class="btn primary" id="save">Save</button></span></div>`;
+  $("modal").classList.remove("hidden");
+
+  $("save").onclick = async () => {
+    const body = { name: $("eName").value, ward: $("eWard").value };
+    if (isUser) Object.assign(body, { emergency_name: $("eCName").value, emergency_chat: $("eChat").value, temp_offset: $("eOff").value });
+    if ($("ePass").value) body.password = $("ePass").value;
+    try { await api(`/api/admin/users/${id}`, { body }); toast("Saved"); closeModal(); load(); } catch (e) { toast(e.message, true); }
+  };
+  $("del").onclick = async () => {
+    if (!confirm(`Delete ${u.name} and all their readings?`)) return;
+    try { await api(`/api/admin/users/${id}/delete`, { body: {} }); toast("Deleted"); closeModal(); load(); } catch (e) { toast(e.message, true); }
+  };
+  if (!isUser) return;
+  $("findChat").onclick = async () => {
+    const r = await api("/api/admin/telegram/chats");
+    if (!r.ok) { $("chatList").innerHTML = `<div class="c-amber" style="font-size:13px">${fmt.esc(r.error || "Could not reach Telegram")}</div>`; return; }
+    $("chatList").innerHTML = r.chats.length ? '<div class="dim" style="font-size:12px">Click a person to use their chat ID:</div>' + r.chats.map(c =>
+      `<div class="kv" data-id="${c.chat_id}" data-name="${fmt.esc(c.name)}"><span>${fmt.esc(c.name)} ${c.username ? "@" + fmt.esc(c.username) : ""}</span><span>${c.chat_id}</span></div>`).join("")
+      : '<div class="c-amber" style="font-size:13px">Nobody has messaged the bot yet. Ask the contact to open the bot and press Start.</div>';
+    $("chatList").querySelectorAll(".kv").forEach(el => el.onclick = () => {
+      $("eChat").value = el.dataset.id; if (!$("eCName").value) $("eCName").value = el.dataset.name;
+    });
+  };
+  $("testAlert").onclick = async () => {
+    await api(`/api/admin/users/${id}`, { body: { emergency_name: $("eCName").value, emergency_chat: $("eChat").value } });
+    await api(`/api/admin/users/${id}/test_alert`, { body: {} });
+    toast("Test alert sent. Check the Alerts page to see if Telegram delivered it.");
+  };
+  $("calib").onclick = async () => {
+    try { const r = await api(`/api/admin/users/${id}/calibrate`, { body: { thermometer: $("eThermo").value } });
+      $("eOff").value = r.offset.toFixed(2); toast(`Calibrated: skin ${r.skin} °C → offset +${r.offset} °C`); load(); }
+    catch (e) { toast(e.message, true); }
+  };
+  $("retrain").onclick = async () => {
+    const r = await api(`/api/admin/users/${id}/retrain`, { body: {} });
+    toast(r.ok ? `Model retrained on ${r.n} windows` : "Not yet: " + r.reason, !r.ok); load();
+  };
+}
+load();
+</script>
+{% endblock %}
