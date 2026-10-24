@@ -85,6 +85,8 @@ Only one person can measure at a time, because there is one device. Press **Stop
 
 ## Demo walkthrough (for the showcase)
 
+**Demo page (admin → Demo):** sliders for heart rate, SpO₂ and temperature, plus a "finger on sensor" switch, control the fake ESP32 directly. Drag a slider and the member's live page follows within a second; hold SpO₂ below 90 (or temperature at 38.5+) for about 10 seconds and the alert fires. Pages show a **DEMO DATA** tag whenever the readings come from the simulator.
+
 The admin **Station** page has a **Demo · simulator scenario** menu. Choosing a scenario changes what the fake ESP32 sends, so you can show every feature live:
 
 | Scenario | What happens | Shows off |

@@ -252,7 +252,7 @@ function render(d) {
   $("dvRssi").textContent = dv && dv.rssi != null ? dv.rssi + " dBm" : "--";
   $("dvRate").textContent = dv ? dv.rate + " Hz" : "--";
   $("dvLast").textContent = dv ? dv.last_packet_s + " s ago" : "--";
-  $("dvFw").textContent = dv ? dv.fw : "--";
+  $("dvFw").innerHTML = dv ? fmt.esc(dv.fw) + (String(dv.fw).startsWith("sim") ? ' <span class="tag warning">DEMO DATA</span>' : "") : "--";
 }
 
 let busy = false;

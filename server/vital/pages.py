@@ -69,3 +69,9 @@ def admin_users(user):
 @login_required("admin")
 def admin_city(user):
     return render_template("admin_city.html", user=user, page="city", city=config.CITY_NAME)
+
+
+@pages.route("/admin/demo")
+@login_required("admin")
+def admin_demo(user):
+    return render_template("admin_demo.html", user=user, page="demo")

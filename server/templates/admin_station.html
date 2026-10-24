@@ -105,8 +105,9 @@ async function poll() {
     $("stLive").textContent = d.tiles.filter(t => t.measuring).length;
     $("stAlerts").textContent = d.unacknowledged;
     $("stDev").textContent = d.devices.filter(x => x.online).length + " / " + d.devices.length;
-    $("sub").textContent = `${d.tiles.length} users · ${d.devices.filter(x => x.online).length} device online · ` +
-      `Telegram ${d.telegram ? "connected" : "not configured"}`;
+    const sim = d.devices.some(x => x.online && String(x.fw).startsWith("sim"));
+    $("sub").innerHTML = `${d.tiles.length} users · ${d.devices.filter(x => x.online).length} device online · ` +
+      `Telegram ${d.telegram ? "connected" : "not configured"}` + (sim ? ' · <span class="tag warning">DEMO DATA</span>' : "");
     if (!scenarioInit) {
       $("scenario").innerHTML = d.scenarios.map(s => `<option value="${s}">${NAMES[s] || s}</option>`).join("");
       $("scenario").value = d.scenario; scenarioInit = true;

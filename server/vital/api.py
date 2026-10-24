@@ -29,11 +29,45 @@ def reading():
     return jsonify(live.process(payload, request.remote_addr))
 
 
+DEFAULT_MANUAL = {"enabled": False, "bpm": 74, "spo2": 98, "temp": 36.7, "finger": True}
+
+
+def _manual():
+    import json
+    try:
+        return dict(DEFAULT_MANUAL, **json.loads(db.get_setting("sim_manual", "{}")))
+    except Exception:
+        return dict(DEFAULT_MANUAL)
+
+
 @api.get("/demo/scenario")
 def get_scenario():
     if not _device_ok():
         return jsonify({"ok": False, "error": "bad device key"}), 403
-    return jsonify({"scenario": db.get_setting("sim_scenario", "normal")})
+    return jsonify({"scenario": db.get_setting("sim_scenario", "normal"), "manual": _manual()})
+
+
+@api.get("/demo/state")
+@login_required("admin")
+def demo_state(admin):
+    return jsonify({"scenario": db.get_setting("sim_scenario", "normal"), "manual": _manual(),
+                    "scenarios": SCENARIOS, "devices": live.devices_snapshot()})
+
+
+@api.post("/demo/manual")
+@login_required("admin")
+def demo_manual(admin):
+    import json
+    f = request.get_json(silent=True) or {}
+    m = _manual()
+    for k in ("bpm", "spo2", "temp"):
+        if k in f:
+            m[k] = float(f[k])
+    for k in ("enabled", "finger"):
+        if k in f:
+            m[k] = bool(f[k])
+    db.set_setting("sim_manual", json.dumps(m))
+    return jsonify({"ok": True, "manual": m})
 
 
 # ------------------------------------------------------------------ user
@@ -278,6 +312,9 @@ def set_scenario(admin):
     if s not in SCENARIOS:
         return jsonify({"ok": False, "error": "unknown scenario"}), 400
     db.set_setting("sim_scenario", s)
+    import json
+    m = _manual(); m["enabled"] = False                     # a scenario takes over from the sliders
+    db.set_setting("sim_manual", json.dumps(m))
     return jsonify({"ok": True, "scenario": s})
 
 

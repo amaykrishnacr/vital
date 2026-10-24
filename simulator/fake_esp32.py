@@ -44,6 +44,7 @@ class Body:
         self.scenario, self.since = "normal", time.time()
         self.wander = 0.0
         self.dc_ir, self.dc_red = 112000.0, 98000.0
+        self.manual = None                      # slider values from the admin Demo page
 
     def set(self, scenario):
         if scenario != self.scenario:
@@ -64,6 +65,13 @@ class Body:
             hr_t = self.base_hr + 14
         elif s == "high_hr":
             hr_t = 134 + self.wander
+        m = self.manual
+        if m:                                   # Demo page sliders override the scenario
+            hr_t, spo2_t, temp_t = m["bpm"] + self.wander * 0.5, m["spo2"], m["temp"]
+            self.hr += (hr_t - self.hr) * 0.5
+            self.spo2 += (spo2_t - self.spo2) * 0.5
+            self.temp += (temp_t - self.temp) * 0.5
+            return
         k_hr = 0.25 if s != "high_hr" else 0.15
         self.hr += (hr_t - self.hr) * k_hr
         self.spo2 += (spo2_t - self.spo2) * (0.12 if s == "low_oxygen" else 0.2)
@@ -71,7 +79,7 @@ class Body:
 
     def reading(self, device):
         s = self.scenario
-        finger = s != "no_finger"
+        finger = s != "no_finger" if not self.manual else bool(self.manual.get("finger", True))
         noisy = s == "noisy"
         bpm = self.hr + random.gauss(0, 1.2) + (random.gauss(0, 14) if noisy else 0)
         # the steady (DC) light level drifts slowly, like a real fingertip
@@ -121,14 +129,17 @@ def main():
         try:
             if args.scenario:
                 body.set(args.scenario)
-            elif t0 - last_check > 2:
-                body.set(get(args.server + "/api/demo/scenario", args.key).get("scenario", "normal"))
+            elif t0 - last_check > 0.9:
+                st = get(args.server + "/api/demo/scenario", args.key)
+                body.set(st.get("scenario", "normal"))
+                m = st.get("manual") or {}
+                body.manual = m if m.get("enabled") else None
                 last_check = t0
             body.step()
             payload = body.reading(args.device)
             reply = post(args.server + "/api/reading", args.key, payload)
             who = reply.get("user") or "nobody measuring"
-            line = (f"[{time.strftime('%H:%M:%S')}] {body.scenario:<10} HR {payload['bpm']:6.1f}  "
+            line = (f"[{time.strftime('%H:%M:%S')}] {'sliders' if body.manual else body.scenario:<10} HR {payload['bpm']:6.1f}  "
                     f"SpO2 {payload['spo2']:5.1f}  skin {payload['temp']:5.2f}C  -> {who:<14} {reply.get('msg', '')}")
             print(line[:120])
         except urllib.error.HTTPError as e:

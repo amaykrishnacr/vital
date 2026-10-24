@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Demo controls{% endblock %}
+{% block content %}
+<style>
+  .sl { margin-bottom: 26px; }
+  .sl .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .sl .v { font-family: var(--mono); font-size: 34px; font-weight: 700; }
+  input[type=range] { width: 100%; accent-color: var(--cyan); height: 28px; }
+  .scen { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .scen .btn { justify-content: center; padding: 12px; }
+  .scen .btn.on { border-color: var(--cyan); color: var(--cyan); }
+  .switch { display: flex; align-items: center; gap: 12px; cursor: pointer; font-weight: 600; }
+  .switch input { width: 22px; height: 22px; accent-color: var(--green); }
+  .marks { display: flex; justify-content: space-between; color: var(--dim); font-size: 12px; font-family: var(--mono); }
+</style>
+<div class="page-head">
+  <div><h1>Demo controls</h1><p>Controls the fake ESP32 (start_simulator.bat). Changes reach the live pages within a second.</p></div>
+  <div class="spacer"></div>
+  <span id="devState" class="tag off">no simulator</span>
+</div>
+
+<div class="grid" style="grid-template-columns: 1.4fr 1fr;">
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <label class="switch"><input type="checkbox" id="enabled"> Use sliders</label>
+      <label class="switch"><input type="checkbox" id="finger" checked> Finger on sensor</label>
+    </div>
+    <div class="sl">
+      <div class="top"><span class="label c-green">Heart rate</span><span><span class="v c-green" id="bpmV">74</span> <span class="muted">bpm</span></span></div>
+      <input type="range" id="bpm" min="40" max="160" step="1" value="74">
+      <div class="marks"><span>40</span><span>alert &lt; 45</span><span>normal 60–100</span><span>alert &gt; 120</span><span>160</span></div>
+    </div>
+    <div class="sl">
+      <div class="top"><span class="label c-cyan">SpO₂</span><span><span class="v c-cyan" id="spo2V">98</span> <span class="muted">%</span></span></div>
+      <input type="range" id="spo2" min="80" max="100" step="1" value="98">
+      <div class="marks"><span>80</span><span>alert &lt; 90</span><span>healthy ≥ 95</span><span>100</span></div>
+    </div>
+    <div class="sl" style="margin-bottom:6px">
+      <div class="top"><span class="label c-amber">Body temperature</span><span><span class="v c-amber" id="tempV">36.7</span> <span class="muted">°C</span></span></div>
+      <input type="range" id="temp" min="35" max="40" step="0.1" value="36.7">
+      <div class="marks"><span>35</span><span>normal 36.1–37.4</span><span>fever ≥ 38</span><span>alert ≥ 38.5</span><span>40</span></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="label c-violet">Scenarios</div>
+    <p class="muted" style="font-size:13px;margin:6px 0 14px">A scenario plays an automatic story and switches the sliders off.</p>
+    <div class="scen" id="scen"></div>
+    <div class="label" style="margin-top:22px">Tips</div>
+    <ul class="muted" style="font-size:13px;line-height:1.7;padding-left:18px;margin:8px 0 0">
+      <li>A member must press <b>Start measurement</b> first.</li>
+      <li>Alerts need the value held for about 10 seconds.</li>
+      <li>The same alert won't repeat for 5 minutes. Acknowledge it on the Alerts page.</li>
+      <li><i>Developing fever</i> shows the trend prediction after ~2 minutes.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+const NAMES = { normal: "Normal resting", exercise: "After exercise", fever: "Developing fever", low_oxygen: "Oxygen dropping",
+                high_hr: "High heart rate", noisy: "Moving finger", no_finger: "No finger" };
+let timer = null, current = null;
+
+function show() {
+  $("bpmV").textContent = $("bpm").value;
+  $("spo2V").textContent = $("spo2").value;
+  $("tempV").textContent = Number($("temp").value).toFixed(1);
+}
+function send(extra = {}) {
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    try {
+      await api("/api/demo/manual", { body: Object.assign({
+        enabled: $("enabled").checked, finger: $("finger").checked,
+        bpm: +$("bpm").value, spo2: +$("spo2").value, temp: +$("temp").value }, extra) });
+      load();
+    } catch (e) { toast(e.message, true); }
+  }, 120);
+}
+["bpm", "spo2", "temp"].forEach(id => $(id).oninput = () => { show(); $("enabled").checked = true; send(); });
+$("enabled").onchange = () => send();
+$("finger").onchange = () => { $("enabled").checked = true; send(); };
+
+async function load() {
+  const d = await api("/api/demo/state");
+  const m = d.manual;
+  if (document.activeElement.type !== "range") {
+    $("enabled").checked = m.enabled; $("finger").checked = m.finger;
+    $("bpm").value = m.bpm; $("spo2").value = m.spo2; $("temp").value = m.temp; show();
+  }
+  current = m.enabled ? null : d.scenario;
+  $("scen").innerHTML = d.scenarios.map(s => `<button class="btn ${s === current ? "on" : ""}" data-s="${s}">${NAMES[s] || s}</button>`).join("");
+  $("scen").querySelectorAll("button").forEach(b => b.onclick = async () => {
+    await api("/api/demo/scenario", { body: { scenario: b.dataset.s } }); toast("Scenario: " + NAMES[b.dataset.s]); load();
+  });
+  const sim = d.devices.find(x => x.online && String(x.fw).startsWith("sim"));
+  $("devState").className = "tag " + (sim ? "ok" : "off");
+  $("devState").textContent = sim ? "simulator connected" : "simulator not running";
+}
+load(); setInterval(load, 3000);
+</script>
+{% endblock %}
