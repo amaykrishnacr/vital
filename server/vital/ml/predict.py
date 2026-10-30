@@ -44,11 +44,14 @@ def forecast(readings):
         b, a = np.polyfit(t, y, 1)                       # slope per minute, intercept
         now = a                                          # fitted value at t = 0
         future = a + b * HORIZON_MIN
-        # the newest half of the data must still be moving the same way;
-        # this ignores one-off jumps (e.g. after standing up) that a single line would extend
+        # A real deterioration is a steady drift. Both the older and the newer half
+        # of the window must move the same way at no less than half the overall rate;
+        # this rejects one-off jumps (e.g. after standing up) that a single line would extend.
         half = len(t) // 2
-        b_recent = np.polyfit(t[half:], y[half:], 1)[0]
-        trending = direction * b * HORIZON_MIN >= min_change and direction * b_recent >= 0.5 * direction * b
+        b_old = np.polyfit(t[:half], y[:half], 1)[0]
+        b_new = np.polyfit(t[half:], y[half:], 1)[0]
+        steady = min(direction * b_old, direction * b_new) >= 0.5 * direction * b
+        trending = direction * b * HORIZON_MIN >= min_change and steady
         crosses = direction * (future - limit) >= 0 and direction * (now - limit) < 0
         if trending and crosses:
             eta = (limit - now) / b

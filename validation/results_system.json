@@ -1,0 +1,367 @@
+[
+ {
+  "rep": 1,
+  "scenario": "normal",
+  "user": "member1",
+  "seconds": 150,
+  "expected": "no alert",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 150,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 148
+  }
+ },
+ {
+  "rep": 1,
+  "scenario": "exercise",
+  "user": "member2",
+  "seconds": 150,
+  "expected": "no critical alert",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 150,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 4,
+   "Keep an eye": 144
+  }
+ },
+ {
+  "rep": 1,
+  "scenario": "low_oxygen",
+  "user": "member3",
+  "seconds": 150,
+  "expected": "critical alert",
+  "first_warning_s": null,
+  "first_critical_s": 59.0,
+  "critical_alerts": 2,
+  "warnings": 0,
+  "readings_stored": 151,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 9,
+   "Keep an eye": 41,
+   "Check this": 98
+  }
+ },
+ {
+  "rep": 1,
+  "scenario": "high_hr",
+  "user": "member4",
+  "seconds": 120,
+  "expected": "critical alert",
+  "first_warning_s": null,
+  "first_critical_s": 19.6,
+  "critical_alerts": 1,
+  "warnings": 0,
+  "readings_stored": 115,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 1,
+   "Poor signal": 6,
+   "Keep an eye": 5,
+   "Check this": 107
+  }
+ },
+ {
+  "rep": 1,
+  "scenario": "fever",
+  "user": "member1",
+  "seconds": 300,
+  "expected": "early warning",
+  "first_warning_s": 104.7,
+  "first_critical_s": 39.7,
+  "critical_alerts": 1,
+  "warnings": 2,
+  "readings_stored": 300,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 9,
+   "Keep an eye": 229,
+   "Check this": 59
+  }
+ },
+ {
+  "rep": 1,
+  "scenario": "noisy",
+  "user": "member2",
+  "seconds": 120,
+  "expected": "readings rejected, no alert",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 3,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 3,
+   "Poor signal": 116
+  }
+ },
+ {
+  "rep": 1,
+  "scenario": "no_finger",
+  "user": "member3",
+  "seconds": 60,
+  "expected": "nothing stored",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 0,
+  "statuses": {
+   "Not measuring": 1,
+   "No finger": 59
+  }
+ },
+ {
+  "rep": 2,
+  "scenario": "normal",
+  "user": "member4",
+  "seconds": 150,
+  "expected": "no alert",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 150,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 148
+  }
+ },
+ {
+  "rep": 2,
+  "scenario": "exercise",
+  "user": "member1",
+  "seconds": 150,
+  "expected": "no critical alert",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 148,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 3,
+   "Poor signal": 2,
+   "Keep an eye": 143
+  }
+ },
+ {
+  "rep": 2,
+  "scenario": "low_oxygen",
+  "user": "member2",
+  "seconds": 150,
+  "expected": "critical alert",
+  "first_warning_s": null,
+  "first_critical_s": 29.6,
+  "critical_alerts": 2,
+  "warnings": 0,
+  "readings_stored": 150,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 9,
+   "Keep an eye": 20,
+   "Check this": 119
+  }
+ },
+ {
+  "rep": 2,
+  "scenario": "high_hr",
+  "user": "member3",
+  "seconds": 120,
+  "expected": "critical alert",
+  "first_warning_s": null,
+  "first_critical_s": 18.3,
+  "critical_alerts": 1,
+  "warnings": 0,
+  "readings_stored": 115,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 1,
+   "Poor signal": 6,
+   "Keep an eye": 4,
+   "Check this": 108
+  }
+ },
+ {
+  "rep": 2,
+  "scenario": "fever",
+  "user": "member4",
+  "seconds": 300,
+  "expected": "early warning",
+  "first_warning_s": 102.7,
+  "first_critical_s": 49.4,
+  "critical_alerts": 1,
+  "warnings": 3,
+  "readings_stored": 300,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 9,
+   "Keep an eye": 229,
+   "Check this": 59
+  }
+ },
+ {
+  "rep": 2,
+  "scenario": "noisy",
+  "user": "member1",
+  "seconds": 120,
+  "expected": "readings rejected, no alert",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 2,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 2,
+   "Poor signal": 117
+  }
+ },
+ {
+  "rep": 2,
+  "scenario": "no_finger",
+  "user": "member2",
+  "seconds": 60,
+  "expected": "nothing stored",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 0,
+  "statuses": {
+   "Not measuring": 1,
+   "No finger": 59
+  }
+ },
+ {
+  "rep": 3,
+  "scenario": "normal",
+  "user": "member3",
+  "seconds": 150,
+  "expected": "no alert",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 150,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 148
+  }
+ },
+ {
+  "rep": 3,
+  "scenario": "exercise",
+  "user": "member4",
+  "seconds": 150,
+  "expected": "no critical alert",
+  "first_warning_s": 103.8,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 1,
+  "readings_stored": 149,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 2,
+   "Poor signal": 1,
+   "Keep an eye": 145
+  }
+ },
+ {
+  "rep": 3,
+  "scenario": "low_oxygen",
+  "user": "member1",
+  "seconds": 150,
+  "expected": "critical alert",
+  "first_warning_s": 105.7,
+  "first_critical_s": 29.9,
+  "critical_alerts": 2,
+  "warnings": 1,
+  "readings_stored": 150,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 9,
+   "Keep an eye": 20,
+   "Check this": 119
+  }
+ },
+ {
+  "rep": 3,
+  "scenario": "high_hr",
+  "user": "member2",
+  "seconds": 120,
+  "expected": "critical alert",
+  "first_warning_s": null,
+  "first_critical_s": 18.7,
+  "critical_alerts": 1,
+  "warnings": 0,
+  "readings_stored": 117,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 1,
+   "Poor signal": 3,
+   "Keep an eye": 6,
+   "Check this": 109
+  }
+ },
+ {
+  "rep": 3,
+  "scenario": "fever",
+  "user": "member3",
+  "seconds": 300,
+  "expected": "early warning",
+  "first_warning_s": 101.7,
+  "first_critical_s": 89.8,
+  "critical_alerts": 1,
+  "warnings": 2,
+  "readings_stored": 300,
+  "statuses": {
+   "Not measuring": 1,
+   "All good": 9,
+   "Keep an eye": 229,
+   "Check this": 59
+  }
+ },
+ {
+  "rep": 3,
+  "scenario": "noisy",
+  "user": "member4",
+  "seconds": 120,
+  "expected": "readings rejected, no alert",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 4,
+  "statuses": {
+   "Not measuring": 1,
+   "Poor signal": 115,
+   "All good": 4
+  }
+ },
+ {
+  "rep": 3,
+  "scenario": "no_finger",
+  "user": "member1",
+  "seconds": 60,
+  "expected": "nothing stored",
+  "first_warning_s": null,
+  "first_critical_s": null,
+  "critical_alerts": 0,
+  "warnings": 0,
+  "readings_stored": 0,
+  "statuses": {
+   "Not measuring": 1,
+   "No finger": 59
+  }
+ }
+]

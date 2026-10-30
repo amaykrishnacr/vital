@@ -45,7 +45,9 @@ def load_all():
             try:
                 _models[uid] = joblib.load(os.path.join(MODEL_DIR, name))
             except Exception:
-                pass
+                continue
+            if "stats" not in _models[uid]:     # upgrade models saved by an older version
+                threading.Thread(target=train, args=(uid,), daemon=True).start()
 
 
 def _user_windows(user_id, limit=3000):
@@ -76,15 +78,41 @@ def baseline(user_id):
     return _baselines.get(user_id) or compute_baseline(user_id)
 
 
-def train(user_id):
-    """Train (or retrain) this user's Isolation Forest. Returns info dict."""
-    rows = _user_windows(user_id)
-    if len(rows) < MIN_WINDOWS:
-        return {"ok": False, "reason": f"needs {MIN_WINDOWS} windows, has {len(rows)}"}
+# Smallest spread allowed for each vital, so a very steady person is not over-sensitive
+SD_FLOOR = {"hr_mean": 2.0, "spo2_mean": 0.5, "temp_mean": 0.1}
+K_IF = 3.0                # slope of the Isolation Forest score curve (calibrated, see validation/)
+Z_MID, K_Z = 4.5, 1.5     # per-vital deviation (in robust standard deviations) mapped to 0..1
+
+
+def fit_windows(rows):
+    """Build one user's personal model from their quality-accepted 10-second windows.
+
+    Two parts:
+      - an Isolation Forest over 5 window features, which catches unusual
+        combinations (e.g. pulse a little high AND temperature a little high);
+      - a robust per-vital baseline (median and MAD), which catches one vital
+        drifting far from this person's own normal.
+    """
     X = np.array([_vector(r) for r in rows])
     model = IsolationForest(n_estimators=200, contamination=0.05, random_state=42)
     model.fit(X)
-    info = {"model": model, "n": len(rows), "trained_at": time.time()}
+    raw = -model.score_samples(X)
+    stats = {}
+    for k in SD_FLOOR:
+        v = np.array([r[k] for r in rows], dtype=float)
+        med = float(np.median(v))
+        sd = float(1.4826 * np.median(np.abs(v - med)))
+        stats[k] = {"median": med, "sd": max(sd, SD_FLOOR[k])}
+    return {"model": model, "n": len(rows), "trained_at": time.time(),
+            "if_p50": float(np.percentile(raw, 50)), "if_p99": float(np.percentile(raw, 99)), "stats": stats}
+
+
+def train(user_id):
+    """Train (or retrain) this user's personal model. Returns info dict."""
+    rows = _user_windows(user_id)
+    if len(rows) < MIN_WINDOWS:
+        return {"ok": False, "reason": f"needs {MIN_WINDOWS} windows, has {len(rows)}"}
+    info = fit_windows(rows)
     os.makedirs(MODEL_DIR, exist_ok=True)
     joblib.dump(info, _path(user_id))
     with _lock:
@@ -122,12 +150,26 @@ def _rules_score(w):
     return float(min(1.0, dev))
 
 
+def _sigmoid(x):
+    return 1.0 / (1.0 + math.exp(-max(-50.0, min(50.0, x))))
+
+
+def personal_parts(info, w):
+    """(Isolation Forest score, per-vital deviation score, largest deviation in SDs)."""
+    raw = float(-info["model"].score_samples(np.array([_vector(w)]))[0])
+    z_if = (raw - info["if_p99"]) / max(info["if_p99"] - info["if_p50"], 1e-6)
+    zmax = max(abs(w[k] - st["median"]) / st["sd"] for k, st in info["stats"].items())
+    return _sigmoid(K_IF * z_if), _sigmoid(K_Z * (zmax - Z_MID)), zmax
+
+
 def score(user_id, w):
     """Anomaly score 0 (normal) .. 1 (very unusual) and which method produced it."""
     info = _models.get(user_id)
     if info is None:
         return _rules_score(w), "rules"
-    d = float(info["model"].decision_function(np.array([_vector(w)]))[0])
-    s = 1.0 / (1.0 + math.exp(12.0 * d))
+    if "stats" not in info:                     # model saved by an older version
+        d = float(info["model"].decision_function(np.array([_vector(w)]))[0])
+        return max(1.0 / (1.0 + math.exp(12.0 * d)), _rules_score(w) * 0.9), "personal"
+    s_if, s_z, _ = personal_parts(info, w)
     # a reading that breaks the population limits is always at least as unusual
-    return max(s, _rules_score(w) * 0.9), "personal"
+    return max(s_if, s_z, _rules_score(w) * 0.9), "personal"

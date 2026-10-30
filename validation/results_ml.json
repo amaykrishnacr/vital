@@ -1,0 +1,139 @@
+{
+  "A": {
+    "people": 40,
+    "train_windows_per_person": 180,
+    "flag_threshold": 0.7,
+    "rows": [
+      {
+        "case": "Healthy held-out windows (false alarms)",
+        "n": 6000,
+        "fixed": 0.0,
+        "if_only": 0.0015,
+        "base_only": 0.0,
+        "vital": 0.0015
+      },
+      {
+        "case": "Healthy, resting HR ≥ 85 bpm (false alarms)",
+        "n": 1200,
+        "fixed": 0.0,
+        "if_only": 0.0016666666666666668,
+        "base_only": 0.0,
+        "vital": 0.0016666666666666668
+      },
+      {
+        "case": "Personal deviation (population-normal): HR +20 bpm (detected)",
+        "n": 960,
+        "fixed": 0.0,
+        "if_only": 0.020833333333333332,
+        "base_only": 1.0,
+        "vital": 1.0
+      },
+      {
+        "case": "Subtle combined: HR +12 bpm and temp +0.5 °C (detected)",
+        "n": 1600,
+        "fixed": 0.133125,
+        "if_only": 0.191875,
+        "base_only": 0.938125,
+        "vital": 0.949375
+      },
+      {
+        "case": "Tachycardia at rest: HR 125 bpm (detected)",
+        "n": 1600,
+        "fixed": 1.0,
+        "if_only": 0.01625,
+        "base_only": 1.0,
+        "vital": 1.0
+      },
+      {
+        "case": "Hypoxia: SpO2 87 % (detected)",
+        "n": 1600,
+        "fixed": 1.0,
+        "if_only": 0.019375,
+        "base_only": 1.0,
+        "vital": 1.0
+      },
+      {
+        "case": "Fever: 38.6 °C (detected)",
+        "n": 1600,
+        "fixed": 1.0,
+        "if_only": 0.026875,
+        "base_only": 1.0,
+        "vital": 1.0
+      }
+    ],
+    "seconds": 365.7
+  },
+  "B": {
+    "temp": {
+      "trajectories": 116,
+      "warned_before_crossing": 116,
+      "missed": 0,
+      "lead_median_min": 5.308333333333334,
+      "lead_p10_min": 2.8,
+      "eta_abs_error_median_min": 0.375
+    },
+    "spo2": {
+      "trajectories": 120,
+      "warned_before_crossing": 120,
+      "missed": 0,
+      "lead_median_min": 5.8583333333333325,
+      "lead_p10_min": 3.7783333333333333,
+      "eta_abs_error_median_min": 0.5833333333333326
+    },
+    "no_rise": {
+      "stable": {
+        "trajectories": 120,
+        "false_warnings": 0
+      },
+      "step": {
+        "trajectories": 120,
+        "false_warnings": 0
+      }
+    }
+  },
+  "C": {
+    "clean": {
+      "n": 300,
+      "accepted": 292
+    },
+    "motion": {
+      "n": 300,
+      "accepted": 47
+    },
+    "poor placement": {
+      "n": 300,
+      "accepted": 57
+    }
+  },
+  "D": {
+    "n": 1200,
+    "accuracy": 1.0,
+    "confusion": {
+      "Elevated": {
+        "Elevated": 300,
+        "Low oxygen": 0,
+        "Possible fever": 0,
+        "Resting": 0
+      },
+      "Low oxygen": {
+        "Elevated": 0,
+        "Low oxygen": 300,
+        "Possible fever": 0,
+        "Resting": 0
+      },
+      "Possible fever": {
+        "Elevated": 0,
+        "Low oxygen": 0,
+        "Possible fever": 300,
+        "Resting": 0
+      },
+      "Resting": {
+        "Elevated": 0,
+        "Low oxygen": 0,
+        "Possible fever": 0,
+        "Resting": 300
+      }
+    }
+  },
+  "seconds_total": 459.3
+}
