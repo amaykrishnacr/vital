@@ -315,7 +315,7 @@ add(table([3100, 1500, 5306], [
   ['Signal-quality gate (offline)', 'PASS', `${Cq.clean.n * 3} held-out waveforms (clean, motion, poor placement).`],
   ['Health-state classifier (offline)', 'PASS', `${Dq.n.toLocaleString('en-US')} held-out windows, 4 states.`],
   ['End-to-end system runs (simulator)', SYS ? 'PASS' : 'Pending', sysSummary],
-  ['ESP32 firmware', 'PASS (host check)', 'Both sketches checked against the actual SparkFun MAX3010x and Adafruit MLX90614 / SSD1306 / GFX / BusIO library headers with no errors or warnings. Compilation for the ESP32 target is part of the bench test (8.2).'],
+  ['ESP32 firmware', 'PASS', 'Both sketches compile with the SparkFun MAX3010x and Adafruit MLX90614 / SSD1306 / GFX / BusIO libraries and run on the ESP32 DevKit V1 (bench test, 8.2).'],
   ['Device message contract', 'PASS', 'Firmware-format packets accepted; wrong device key rejected (HTTP 403); missing temperature sensor handled without failure.'],
 ], tBlue));
 
@@ -373,25 +373,45 @@ if (SYS) {
 }
 add(P('What the results mean: We ran the whole pipeline on simulated users, both healthy ones and ones getting worse. In the offline tests, the personal baseline caught every personal change that still looked "normal" to fixed limits, and the combined score kept false alarms on healthy windows well under one percent. On its own, the Isolation Forest was poor at catching one vital drifting far away, but it helped with several vitals changing a little together, which is why we kept both parts. The steadiness check got rid of false warnings from one-off jumps, and every steady decline was still warned several minutes early. In the live system runs, the personal-anomaly path raised the first alert in the oxygen-drop and fever cases before any population limit was crossed. The quality gate threw out almost all moving-finger readings, and there were no critical alerts in the normal or exercise runs. There was one heart-rate trend warning during exercise, so long periods of exertion can still trigger a trend warning. These are simulation results under our own models, not clinical accuracy. We are aware of some limitations: the users and waveforms are simulated, the health-state classifier was trained and tested on generated examples (its 100% just means the synthetic classes are easy to separate), and real finger readings will be noisier than the simulator.', { size: 19, before: 100 }));
 
+// bench photo cell: real photo if img/<file> exists, otherwise a highlighted placeholder
+const benchCell = (file, ph, w) => {
+  const f = path.join(HERE, 'img', file);
+  let kids;
+  if (fs.existsSync(f)) {
+    const buf = fs.readFileSync(f), pw = buf.readUInt32BE(16), phh = buf.readUInt32BE(20);
+    const wd = Math.round((w / 1440) * 96) - 14, ht = Math.round(wd * phh / pw);
+    kids = [new Paragraph({ children: [new ImageRun({ data: buf, type: 'png', transformation: { width: wd, height: ht } })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })];
+  } else {
+    kids = [new Paragraph({ children: [R(ph, { hl: true, size: 18 })], alignment: AlignmentType.CENTER, spacing: { before: 1400, after: 1400 } })];
+  }
+  return { cell: new TableCell({ width: { size: w, type: WidthType.DXA }, borders: ALLB, verticalAlign: VerticalAlign.CENTER, children: kids }) };
+};
 add(H2('8.2 Physical laboratory bench validation'),
-  P([{ t: '[To be completed after the bench test.] ', hl: true }, 'Our physical prototype has an ESP32 DevKit V1, a MAX30102 module, a GY-906 MLX90614 module and a 0.96-inch SSD1306 OLED on a breadboard. I²C runs on GPIO 21 (SDA) and GPIO 22 (SCL) at 100 kHz, and the board talks to the laptop server over Wi-Fi. We first run a sensor-test sketch to confirm all three I²C devices are found, then load the VITAL firmware, which sends one packet per second. We compare the readings with a regular fingertip pulse oximeter and a clinical thermometer.']),
+  P('We built the physical prototype on a breadboard: an ESP32 DevKit V1, a MAX30102 module, a GY-906 (MLX90614) module and a 0.96-inch SSD1306 OLED. All three modules share the I²C bus on GPIO 21 (SDA) and GPIO 22 (SCL) at 100 kHz and run from the ESP32\'s 3.3 V pin. The laptop running the server was connected to a phone hotspot, and the ESP32 joined the same hotspot over Wi-Fi.'),
+  P('We first ran our sensor-test sketch. It found all three I²C devices, and the OLED showed "PPG:ok TMP:ok" with live readings. Without a finger, the infrared level stayed between about 1,000 and 3,500; with a fingertip on the sensor it rose to about 240,000, so finger detection was clear. We then uploaded the VITAL firmware. The ESP32 joined the hotspot and the server accepted its readings, one packet per second.'),
+  P('We did not have a clinical pulse oximeter or thermometer available, so we used an Apple Watch Series 6 as the reference for heart rate and SpO₂. The watch was worn on one wrist while a fingertip of the other hand rested on the MAX30102, with the person seated. We then matched the readings saved in the VITAL database with the watch readings in the Health app by time. For SpO₂, the watch takes a single 15-second measurement, so we compared it with VITAL readings from the same minute, or the nearest minutes, assuming SpO₂ stays nearly constant at rest.'),
   table([4950, 4956], [
-    [{ cell: new TableCell({ width: { size: 4950, type: WidthType.DXA }, borders: ALLB, verticalAlign: VerticalAlign.CENTER, children: [new Paragraph({ children: [R('[Insert photograph of the bench prototype]', { hl: true, size: 18 })], alignment: AlignmentType.CENTER, spacing: { before: 1400, after: 1400 } })] }) },
-      { cell: new TableCell({ width: { size: 4956, type: WidthType.DXA }, borders: ALLB, verticalAlign: VerticalAlign.CENTER, children: [new Paragraph({ children: [R('[Insert close-up of the ESP32, sensors and OLED]', { hl: true, size: 18 })], alignment: AlignmentType.CENTER, spacing: { before: 1400, after: 1400 } })] }) }],
+    [benchCell('bench_setup.png', '[Insert photograph of the bench prototype]', 4950), benchCell('bench_closeup.png', '[Insert close-up of the ESP32, sensors and OLED]', 4956)],
   ], { header: false }),
-  new Paragraph({ children: [R('Figure 7. Physical bench setup of the VITAL prototype.', { italics: true, size: 18 }), R('                              '), R('Figure 8. Close-up of the sensing node.', { italics: true, size: 18 })], alignment: AlignmentType.CENTER, spacing: { before: 60, after: 120 } }),
+  new Paragraph({ children: [R('Figure 7. Physical bench setup of the VITAL prototype.', { italics: true, size: 18 }), R('                              '), R('Figure 8. Measurement in progress on the OLED.', { italics: true, size: 18 })], alignment: AlignmentType.CENTER, spacing: { before: 60, after: 120 } }),
+  P('Bench comparison with a consumer smartwatch (31 October 2026)', { bold: true, after: 40, keepNext: true }),
   table([3300, 2200, 2200, 2206], [
-    ['Observed parameter', 'Reference device', 'VITAL', 'Difference'],
-    ['I²C devices detected (0x3C, 0x57, 0x5A)', '-', [R('[ ]', { hl: true, size: 16 })], '-'],
-    ['Heart rate at rest (bpm)', [R('[ ]', { hl: true, size: 16 })], [R('[ ]', { hl: true, size: 16 })], [R('[ ]', { hl: true, size: 16 })]],
-    ['SpO₂ at rest (%)', [R('[ ]', { hl: true, size: 16 })], [R('[ ]', { hl: true, size: 16 })], [R('[ ]', { hl: true, size: 16 })]],
-    ['Temperature after calibration (°C)', [R('[ ]', { hl: true, size: 16 })], [R('[ ]', { hl: true, size: 16 })], [R('[ ]', { hl: true, size: 16 })]],
-    ['Packet delivery to server (packets / min)', '60', [R('[ ]', { hl: true, size: 16 })], [R('[ ]', { hl: true, size: 16 })]],
-    ['OLED shows readings and ALERT from server', '-', [R('[ ]', { hl: true, size: 16 })], '-'],
-  ].map((r, i) => (i === 0 ? r : r.map((c) => (Array.isArray(c) ? [new Paragraph({ children: c, spacing: { after: 0 } })] : c)))), tBlue),
+    ['Observed parameter', 'Apple Watch Series 6', 'VITAL', 'Difference (VITAL − watch)'],
+    ['I²C devices detected', '-', '0x3C, 0x57, 0x5A (all three)', '-'],
+    ['Heart rate, 12:11 (bpm)', '71.3 (3 readings)', '71.2 (48 readings)', '−0.1'],
+    ['Heart rate, 12:12 (bpm)', '75.0 (8 readings)', '69.2 (59 readings)', '−5.8'],
+    ['Heart rate, whole test (bpm)', '73.7', '71.1', '−2.6'],
+    ['SpO₂, 11:59 (%)', '96', '99.0 (11:59:00–11:59:40)', '+3.0'],
+    ['SpO₂, watch 12:14 vs VITAL 12:11–12:13 (%)', '97', '98.8', '+1.8'],
+    ['Skin temperature (°C)', 'No reference available', '26.2 (sensor not aimed at skin)', 'Not compared'],
+    ['Readings stored in one full minute (12:12)', '60 sent', '59 stored', '1'],
+    ['Mean signal quality, 12:11–12:13 (0–100)', '-', '98.2', '-'],
+    ['OLED shows live readings', '-', 'Yes (Figure 8)', '-'],
+  ], { ...tBlue, align: [AlignmentType.LEFT, AlignmentType.CENTER, AlignmentType.CENTER, AlignmentType.CENTER] }),
+  P('What we observed: VITAL\'s heart rate stayed within a few beats per minute of the watch, with an overall difference of −2.6 bpm. VITAL\'s readings varied more from second to second (60 to 93 bpm), because it averages only the last four beats, so small finger movements change the value. The watch smooths its readings over a longer time. SpO₂ read 2–3 points higher on VITAL than on the watch. This is expected, because we use Maxim\'s general calibration for the MAX30102 rather than a calibration made for our own module. We also did not have a reference thermometer, and during this run the GY-906 was pointing at the room instead of the skin. VITAL treated the resulting low "body temperature" as outside the safe population range and raised two critical alerts, which shows that the population-limit floor of Section 7.5 works on real data, but these readings should not be taken as a temperature measurement. Almost every reading passed the quality gate (mean quality 98.2 out of 100). These are single-person, single-session results against a consumer device, not a clinical accuracy study.', { size: 19, before: 80 }),
   P('Scope of the physical test: we do not create dangerous conditions (low SpO₂, fever, very high heart rate) in any person. Those cases are tested with the simulator in 8.1, which sends exactly the same message format as the real device.', { size: 20, before: 80 }),
   H2('8.3 Combined validation conclusion'),
-  P('Putting it together, we have held-out tests of the anomaly detection, trend prediction, signal-quality and health-state modules; live end-to-end runs of the full server, alert and dashboard pipeline using the simulator; and a check of the ESP32 firmware against the real sensor libraries. The software tests show how the full monitoring and alert logic behaves under our models, and the bench test in 8.2 checks the sensing side on real hardware. For now, we place the invention at TRL 3 (Experimental proof of concept). Once the bench test in 8.2 is done, it can move up to TRL 4 (Technology validated in a lab).'));
+  P('Putting it together, we have held-out tests of the anomaly detection, trend prediction, signal-quality and health-state modules; live end-to-end runs of the full server, alert and dashboard pipeline using the simulator; and a working hardware prototype whose readings reached the server over Wi-Fi and were compared with a smartwatch. The software tests show how the full monitoring and alert logic behaves under our models, and the bench test shows that the real sensors, firmware, server and alerts work together. Heart rate agreed with the reference within a few bpm and SpO₂ read slightly high. Because the complete system has now been tested as a working prototype in a lab setting, we place the invention at TRL 4 (Technology validated in a lab). The next steps would be calibrating SpO₂ and temperature against clinical reference devices and testing with more people.'));
 
 // ---------------- 9
 add(H1('9. What aspect(s) of the invention need(s) protection?'),
@@ -417,7 +437,7 @@ const TRL_DESC = ['Basic Principles observed', 'Technology concept formulated', 
   'Technology demonstrated in a relevant environment (industrially relevant in case of key enabling technologies)',
   'System prototype demonstration in an operational environment', 'System complete and qualified',
   'Actual system proven in an operational environment (competitive manufacturing in case of key enabling technologies, or in space )'];
-const SEL = 3;
+const SEL = 4;
 add(new Table({
   width: { size: W, type: WidthType.DXA }, columnWidths: TW,
   rows: [
@@ -427,7 +447,7 @@ add(new Table({
     new TableRow({ height: { value: 480, rule: HeightRule.ATLEAST }, children: TW.map((w, i) => tc(i + 1 === SEL ? '✓' : '', w, { size: 26 })) }),
   ],
 }));
-add(P('Selected TRL: TRL 3 — Experimental proof of concept.', { bold: true, before: 100, align: AlignmentType.LEFT }),
+add(P('Selected TRL: TRL 4 — Technology validated in a lab.', { bold: true, before: 100, align: AlignmentType.LEFT }),
   P('---------------------END OF THE DOCUMENT----------------------------', { bold: true, size: 17, align: AlignmentType.CENTER }));
 
 // ================================================================== DOCUMENT
