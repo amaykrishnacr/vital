@@ -332,14 +332,48 @@ void setMsg(const char *msg) {
   xSemaphoreGive(stateMutex);
 }
 
+// Explains the Wi-Fi status in plain words on the Serial Monitor.
+const char *wifiReason(wl_status_t s) {
+  switch (s) {
+    case WL_NO_SSID_AVAIL:  return "network NOT FOUND (name wrong, 5 GHz only, or hotspot hidden)";
+    case WL_CONNECT_FAILED: return "network found but join FAILED (password wrong?)";
+    case WL_CONNECTION_LOST:return "connection lost";
+    case WL_DISCONNECTED:   return "not connected yet / password rejected";
+    case WL_IDLE_STATUS:    return "still trying";
+    default:                return "unknown";
+  }
+}
+
+// Lists the Wi-Fi networks the ESP32 can see, so we know if the hotspot is visible.
+void scanAndReport() {
+  WiFi.disconnect();
+  delay(100);
+  int n = WiFi.scanNetworks();
+  bool seen = false;
+  Serial.printf("Wi-Fi scan: %d network(s) visible to the ESP32:\n", n);
+  for (int i = 0; i < n && i < 15; i++) {
+    bool match = WiFi.SSID(i) == WIFI_SSID;
+    seen |= match;
+    Serial.printf("   '%s'  signal %d dBm  channel %d%s\n", WiFi.SSID(i).c_str(), WiFi.RSSI(i), WiFi.channel(i),
+                  match ? "   <-- this is yours" : "");
+  }
+  if (!seen) Serial.printf("   '%s' is NOT in the list. Turn on Maximise Compatibility and keep the Personal Hotspot screen open.\n", WIFI_SSID);
+  WiFi.scanDelete();
+}
+
 void networkTask(void *arg) {
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
   unsigned long lastTry = 0;
+  int tries = 0;
   Packet p;
   for (;;) {
     if (WiFi.status() != WL_CONNECTED) {
       wifiOk = false; serverOk = false;
-      if (millis() - lastTry > 10000 || lastTry == 0) {
+      if (millis() - lastTry > 20000 || lastTry == 0) {      // give slow hotspots 20 s per attempt
+        if (lastTry != 0) Serial.printf("Wi-Fi attempt failed: %s\n", wifiReason(WiFi.status()));
+        if (tries % 3 == 0) scanAndReport();                // scan on the 1st, 4th, 7th... attempt
+        tries++;
         lastTry = millis();
         Serial.printf("Connecting to Wi-Fi '%s'...\n", WIFI_SSID);
         setMsg("Joining Wi-Fi...");
